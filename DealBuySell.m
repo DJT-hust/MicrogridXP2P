@@ -1,11 +1,11 @@
-function DealResults = DealBuySell(seller, buyer)
+function [pair,NoDealSeller,NoDealBuyer] = DealBuySell(seller, buyer)
     %% -----------------交易策略---------------------------
     % 基本思想：高价匹配高价，低价匹配低价
-    % input：seller：P富余的功率；Ptemp
-
+    % input：seller：P富余的功率；Ptemp=P;flag标记，flag=1未卖完
+    %       buyer：P富余的功率；Ptemp=P;flag标记，flag=1未满足
     NIR = 10; %迭代次数
-    Nc = size(buyer); %消费者数目
-    Np = size(seller); %卖出者数目
+    Nc = size(buyer, 1); %消费者数目
+    Np = size(seller, 1); %卖出者数目
     pair = {};
     IrPair = 1;
 
@@ -21,45 +21,57 @@ function DealResults = DealBuySell(seller, buyer)
             buyer(index).Ptemp = buyer(index).P * buyer(index).flag;
         end
 
-        while (sell < Np & buy < Nc)
+        while (sell <= Np && buy <= Nc)
 
-            if (buyer(buy).price >= seller(sell).price) & (buyer(buy).flag == 1 & seller(sell).falg == 1)
+            if (buyer(buy).price >= seller(sell).price) && (buyer(buy).flag == 1 && seller(sell).flag == 1)
 
                 if (buyer(buy).Ptemp > seller(sell).Ptemp)
                     buyer(buy).P = buyer(buy).P - seller(sell).P;
                     buyer(buy).Ptemp = buyer(buy).P;
                     % pair = [pair, [buy, sell, seller(sell).P, seller(sell).price]];
-                    pair(IrPair) = [buy, sell, seller(sell).P, seller(sell).price];
+                    % pair(IrPair) = {buy, sell, seller(sell).P, seller(sell).price};
+                    pair(IrPair).buyername = buyer(buy).name;
+                    pair(IrPair).sellername = seller(sell).name;
+                    pair(IrPair).power = seller(sell).P;
+                    pair(IrPair).price = seller(sell).price;
                     IrPair = IrPair + 1;
                     seller(sell).P = 0;
-                    seller(sell).falg = 0;
+                    seller(sell).flag = 0;
                     seller(sell).Ptemp = 0;
                     sell = sell + 1;
                 elseif (buyer(buy).Ptemp < seller(sell).Ptemp)
-                    seller(sell).P = seller(sell).P - buyer(buy).P
+                    seller(sell).P = seller(sell).P - buyer(buy).P;
                     seller(sell).Ptemp = seller(sell).P;
                     % pair = [pair, [buy, sell, buyer(buy).P, seller(sell).price]];
-                    pair(IrPair) = [buy, sell, seller(sell).P, seller(sell).price];
+                    % pair(IrPair) = {buy, sell, seller(sell).P, seller(sell).price};
+                    pair(IrPair).buyername = buyer(buy).name;
+                    pair(IrPair).sellername = seller(sell).name;
+                    pair(IrPair).power = buyer(buy).P;
+                    pair(IrPair).price = seller(sell).price;
                     IrPair = IrPair + 1;
                     buyer(buy).P = 0;
-                    buyer(buy).falg = 0;
+                    buyer(buy).flag = 0;
                     buyer(buy).Ptemp = 0;
                     buy = buy + 1;
-                elseif (buyer(buy).Ptemp = seller(sell).Ptemp)
+                elseif (buyer(buy).Ptemp == seller(sell).Ptemp)
                     % pair = [pair, [buy, sell, buyer(buy).P, seller(sell).price]];
-                    pair(IrPair) = [buy, sell, seller(sell).P, seller(sell).price];
+                    % pair(IrPair) = {buy, sell, seller(sell).P, seller(sell).price};
+                    pair(IrPair).buyername = buyer(buy).name;
+                    pair(IrPair).sellername = seller(sell).name;
+                    pair(IrPair).power = seller(sell).P;
+                    pair(IrPair).price = seller(sell).price;
                     IrPair = IrPair + 1;
                     seller(sell).P = 0;
-                    seller(sell).falg = 0;
+                    seller(sell).flag = 0;
                     seller(sell).Ptemp = 0;
                     buyer(buy).P = 0;
-                    buyer(buy).falg = 0;
+                    buyer(buy).flag = 0;
                     buyer(buy).Ptemp = 0;
                     sell = sell + 1;
                     buy = buy + 1;
                 end
 
-            elseif (buyer(buy).price < seller(sell).price) & (buyer(buy).flag == 1 & seller(sell).falg == 1)
+            elseif (buyer(buy).price < seller(sell).price) && (buyer(buy).flag == 1 && seller(sell).flag == 1)
 
                 if (buyer(buy).Ptemp > seller(sell).Ptemp)
                     buyer(buy).Ptemp = buyer(buy).P - seller(sell).P;
@@ -69,7 +81,7 @@ function DealResults = DealBuySell(seller, buyer)
                     seller(sell).Ptemp = seller(sell).P - buyer(buy).P;
                     buyer(buy).Ptemp = 0;
                     buy = buy + 1;
-                elseif (buyer(buy).Ptemp = seller(sell).Ptemp)
+                elseif (buyer(buy).Ptemp == seller(sell).Ptemp)
                     seller(sell).Ptemp = 0;
                     buyer(buy).Ptemp = 0;
                     sell = sell + 1;
@@ -83,7 +95,7 @@ function DealResults = DealBuySell(seller, buyer)
 
         end
 
-        FLGA = 0;
+        FLAG = 0;
 
         for index = 1:Np
             FLAG = FLAG + seller(index).flag;
@@ -116,7 +128,9 @@ function DealResults = DealBuySell(seller, buyer)
 
         if seller(index).flag == 1
             % NoDealSeller = [NoDealSeller, [index, seller(index).P]];
-            NoDealSeller(IrNoDealSeller) = [index, seller(index).P];
+            % NoDealSeller(IrNoDealSeller) = {[index, seller(index).P]};
+            NoDealSeller(IrNoDealSeller).name = seller(index).name;
+            NoDealSeller(IrNoDealSeller).power = seller(index).P;
             IrNoDealSeller = IrNoDealSeller + 1;
         end
 
@@ -126,14 +140,16 @@ function DealResults = DealBuySell(seller, buyer)
 
         if buyer(index).flag == 1
             % NoDealBuyer = [NoDealBuyer, [index, buyer(index).P]];
-            NoDealBuyer(IrNoDealBuyer) = [index, buyer(index).P];
+            % NoDealBuyer(IrNoDealBuyer) = {[index, buyer(index).P]};
+            NoDealBuyer(IrNoDealBuyer).name = buyer(index).name;
+            NoDealBuyer(IrNoDealBuyer).power = buyer(index).P;
             IrNoDealBuyer = IrNoDealBuyer + 1;
         end
 
     end
 
-    DealResults.Deal = pair;
-    DealResults.NoDealSeller = NoDealSeller;
-    DealResults.NoDealBuyer = NoDealBuyer;
+    % DealResults.Deal = pair;
+    % DealResults.NoDealSeller = NoDealSeller;
+    % DealResults.NoDealBuyer = NoDealBuyer;
 
 end

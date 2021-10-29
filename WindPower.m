@@ -1,4 +1,4 @@
-function wind_power = windpowermodel(wind_speed) % 已知风�?计算风功率！ 正确的！MW
+function PFact = WindPower(WindVelocity)
     n = size(WindVelocity, 2);
     PFact = zeros(1, n);
     % vCi = 0.5;
@@ -23,4 +23,3 @@ function wind_power = windpowermodel(wind_speed) % 已知风�?计算风功率！
         end
 
     end
-end

@@ -1,4 +1,4 @@
-function Res = MicroGridSim(WindVelocity)
+function [Res,PWFact,PWForecast] = MicroGridSim(WindVelocity,NTAR)
     Mech_Num = 6;
     Sche_len = 1;
     Tar_Num = 25;
@@ -14,11 +14,13 @@ function Res = MicroGridSim(WindVelocity)
     Constrain = [];
     OnPeakTime = [2, 7, 8, 9, 10, 11, 12, 17, 18, 19];
     ElePrice = [];
-    NTAR = 25;
+    % NTAR = 35;
     PDischarge = 7;
     PCharge = 5;
-
-    for index = 1:size(OnPeakTime, 2)
+    WindVelocityForecastErrPercent=0.06;
+    WindVelocityForecastErr=2*WindVelocityForecastErrPercent*(rand(1,24)-0.5);
+    WindVelocityFact=(1+WindVelocityForecastErr).*WindVelocity;
+    for index = 1:Slot_Num
 
         if ismember(index, OnPeakTime)
             ElePrice = [ElePrice, 0.16790];
@@ -36,8 +38,8 @@ function Res = MicroGridSim(WindVelocity)
     DSafety = 2;
     Ppurchase = sdpvar(1, Slot_Num);
     Psale = sdpvar(1, Slot_Num);
-    NM = sdpvar(Mech_Num, Slot_Num);
-    NB = sdpvar(Buf_Num, Slot_Num);
+    NM = intvar(Mech_Num, Slot_Num);
+    NB = intvar(Buf_Num, Slot_Num);
     PW = sdpvar(1, Slot_Num);
     PB = sdpvar(1, Slot_Num);
     Dpmp = sdpvar(1, Slot_Num);
@@ -46,7 +48,8 @@ function Res = MicroGridSim(WindVelocity)
     ChargingState = binvar(2, Slot_Num);
     d = binvar(2, Slot_Num);
     PMarket = sdpvar(1, Slot_Num);
-    PWFact = NPW * windpowermodel(WindVelocity);
+    PWFact = NPW * WindPower(WindVelocityFact);
+    PWForecast = NPW * WindPower(WindVelocity);
     Obj = 0;
 
     for t = 1:Slot_Num
@@ -65,12 +68,13 @@ function Res = MicroGridSim(WindVelocity)
 
         end
 
-        Constrain = [Constrain, sum(NM(:, t) .* P_per_Mech) + sum(NB(:, t) .* P_per_Buff) == Dpmp(t)];
-        PWTemp = PWFact(t);
-        Constrain = [Constrain, 0 <= PW(t) <= PWTemp];
+        Constrain = [Constrain, sum(NM(:, t) .* P_per_Mech') + sum(NB(:, t) .* P_per_Buff') == Dpmp(t)];
+        % PWTemp = PWFact(t);
+        Constrain = [Constrain, 0 <= PW(t) <= PWFact(t)];
+        Constrain = [Constrain, 0 <= PW(t) <= PWForecast(t)];
         Constrain = [Constrain, 0 <= SOC(t) <= SOCMAX];
         Constrain = [Constrain, -PDischarge <= PB(t) <= PCharge];
-
+        % https://yalmip.github.io/example/modellingif/
         if t == 1
             Constrain = [Constrain, sum(ChargingState(:, t)) == 1];
             Constrain = [Constrain, implies(ChargingState(1, t), [PB(t) >= 0, SOC(t) == 3 + PB(t) * etaPos])];
@@ -82,17 +86,26 @@ function Res = MicroGridSim(WindVelocity)
         end
 
         Constrain = [Constrain, SOC(Slot_Num) == 3];
-        Constrain = [Constrain, PMarket(t) == Pw(t) - Dpmp(t) - Doffice(t) - DSafety - PB(t)];
+        Constrain = [Constrain, PMarket(t) == PW(t) - Dpmp(t) - Doffice(t) - DSafety - PB(t)];
         Constrain = [Constrain, sum(d(:, t)) == 1];
         Constrain = [Constrain, implies(d(1, t), [PMarket(t) >= 0, PB(t) >= 0, Ppurchase(t) == 0, Psale(t) == PMarket(t)])];
         Constrain = [Constrain, implies(d(2, t), [PMarket(t) <= 0, PB(t) <= 0, Psale(t) == 0, Ppurchase(t) == -PMarket(t)])];
-
         Obj = Obj + (PWFact(t) - PW(t)) * ElePrice(t) + ElePrice(t) * (Ppurchase(t) + Psale(t));
     end
 
     Constrain = [Constrain, sum(NM(1:Mech_Num - 1, Slot_Num)) + sum(NB(:, Slot_Num)) == 0];
     Constrain = [Constrain, sum(NM(2:Mech_Num, 1)) + sum(NB(:, 1)) == 0];
     Constrain = [Constrain, sum(NM(Mech_Num, :)) >= NTAR];
-    
+    ops = sdpsettings('solver', 'GUROBI', 'verbose', 2, 'debug', 1);
+    Solution = optimize(Constrain, Obj, ops);
+    Res.Ppurchase = value(Ppurchase);
+    Res.Psale = value(Psale);
+    Res.NM = value(NM);
+    Res.NB = value(NB);
+    Res.PW = value(PW);
+    Res.PB = value(PB);
+    Res.Dpmp = value(Dpmp);
+    Res.SOC = value(SOC);
+    Res.PMarket = value(PMarket);
 
 end
